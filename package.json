@@ -1,0 +1,58 @@
+{
+  "name": "cosmonaut",
+  "version": "0.1.0",
+  "description": "Azure Cosmos DB ORM",
+  "main": "dist/index.js",
+  "sideEffects": false,
+  "scripts": {
+    "prepack": "npm run compile",
+    "watch": "rimraf dist && tsc --watch",
+    "compile": "rimraf dist && tsc",
+    "test": "concurrently \"test:*\"",
+    "test:unit": "jest",
+    "test:watch": "jest --watch",
+    "test:lint": "eslint \"src/**/*.ts\"",
+    "test:fmt": "prettier --list-different \"src/**/*.ts\" \"*.md\"",
+    "fmt": "prettier --write \"src/**/*.ts\" \"*.md\" && npm run test:lint -- --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/connor4312/cosmonaut.git"
+  },
+  "keywords": [
+    "azure",
+    "cosmos",
+    "db",
+    "cosmosdb",
+    "orm",
+    "client",
+    "cdb"
+  ],
+  "author": "Connor Peet <connor@peet.io>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/connor4312/cosmonaut/issues"
+  },
+  "homepage": "https://github.com/connor4312/cosmonaut#readme",
+  "prettier": {
+    "printWidth": 100,
+    "arrowParens": "avoid",
+    "singleQuote": true,
+    "trailingComma": "all"
+  },
+  "peerDependencies": {
+    "@azure/cosmos": "^3.0.0"
+  },
+  "devDependencies": {
+    "@azure/cosmos": "^3.9.3",
+    "@types/jest": "^26.0.19",
+    "@typescript-eslint/eslint-plugin": "^4.11.0",
+    "@typescript-eslint/parser": "^4.11.0",
+    "concurrently": "^5.3.0",
+    "eslint": "^7.16.0",
+    "jest": "^26.6.3",
+    "prettier": "^2.2.1",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.1.3"
+  }
+}
