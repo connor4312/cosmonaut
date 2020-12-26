@@ -1,4 +1,5 @@
 import type * as Cosmos from '@azure/cosmos';
+
 export interface ISchemaField {
   partitionKey?: boolean;
 }
@@ -44,9 +45,16 @@ export type CosmosSimplePath<T> = CosmosSimplePathImpl<T, keyof T>;
 
 export class Schema<T> {
   constructor(
-    private readonly schemaMap: SchemaMap<T>,
-    public readonly definition: Cosmos.ContainerDefinition,
+    public readonly schemaMap: SchemaMap<T>,
+    public readonly definition: Cosmos.ContainerRequest,
   ) {}
+
+  /**
+   * Gets the ID of the Cosmos DB container.
+   */
+  public get id() {
+    return this.definition.id!;
+  }
 
   /**
    * Adds a new field to the schema.
@@ -179,7 +187,7 @@ export class Schema<T> {
   public partitionKey(path: CosmosSimplePath<T>) {
     return new Schema(this.schemaMap, {
       ...this.definition,
-      partitionKey: { paths: [path] },
+      partitionKey: path,
     });
   }
 
@@ -206,12 +214,40 @@ export class Schema<T> {
       geospatialConfig: { type },
     });
   }
+
+  /**
+   * Sets the (per-container) throughput, either in RU/s or an auto-scale
+   * configuration.
+   * @see https://docs.microsoft.com/en-us/azure/cosmos-db/provision-throughput-autoscale
+   * @see https://docs.microsoft.com/en-us/azure/cosmos-db/set-throughput
+   */
+  public setThroughput(
+    throughput:
+      | number
+      | Pick<Cosmos.ContainerRequest, 'throughput' | 'maxThroughput' | 'autoUpgradePolicy'>,
+  ) {
+    return new Schema(
+      this.schemaMap,
+      typeof throughput === 'number'
+        ? { ...this.definition, throughput }
+        : { ...this.definition, ...throughput },
+    );
+  }
 }
 
 class AsType<T> {
   declare value: T;
 }
 
-export const createSchema = (containerName: string) => new Schema({}, { id: containerName });
+export const lookupCosmosPath = (object: any, path: string): unknown => {
+  for (const part of path.slice(1).split('/')) {
+    object = object?.[part];
+  }
+
+  return object;
+};
+
+export const createSchema = (containerName: string) =>
+  new Schema<{ id: string }>({ id: {} }, { id: containerName });
 
 export const asType = <T>() => new AsType<T>();
