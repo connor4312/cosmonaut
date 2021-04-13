@@ -1,5 +1,5 @@
 import type * as Cosmos from '@azure/cosmos';
-import { BaseModel, IModelCtor } from './baseModel';
+import { BaseModel } from './baseModel';
 import { IResourceResponse, mapCosmosResourceResponse, Thenable } from './types';
 
 /**
@@ -14,10 +14,9 @@ export interface ICreateOrUpdateOptions<T> extends Cosmos.RequestOptions {
   mustFind?: boolean;
 }
 
-export class Partition<T extends BaseModel<unknown>> {
+export class Partition<T extends { id: string }> {
   constructor(
     private readonly container: Cosmos.Container,
-    private readonly ctor: IModelCtor<T>,
     private partitionKey: string | number,
   ) {}
 
@@ -50,9 +49,8 @@ export class Partition<T extends BaseModel<unknown>> {
     id: string,
     options?: Cosmos.RequestOptions,
   ): Promise<IResourceResponse<T>> {
-    const response = await this.container.item(id, this.partitionKey).read(options);
-    const model = new this.ctor(response.resource);
-    return mapCosmosResourceResponse(response, model);
+    const response = await this.container.item(id, this.partitionKey).read<T>(options);
+    return mapCosmosResourceResponse(response, response.resource!);
   }
 
   /**
@@ -72,11 +70,11 @@ export class Partition<T extends BaseModel<unknown>> {
    * model after making modifications to it.
    * @param options
    */
-  public createOrUpdateUsing(
+  public createOrUpdateUsing<R extends BaseModel<T>>(
     id: string,
-    updateFn: (previous: T | undefined) => Thenable<T>,
+    updateFn: (previous: T | undefined) => Thenable<R>,
     options?: ICreateOrUpdateOptions<T>,
-  ): Promise<T>;
+  ): Promise<R>;
 
   /**
    * Creates or updates a model using the given function. The function will
@@ -91,17 +89,17 @@ export class Partition<T extends BaseModel<unknown>> {
    * model after making modifications to it.
    * @param options Call options
    */
-  public createOrUpdateUsing(
+  public createOrUpdateUsing<R extends BaseModel<T>>(
     id: string,
-    updateFn: (previous: T | undefined) => Thenable<T | typeof AbortUpdate>,
+    updateFn: (previous: T | undefined) => Thenable<R | typeof AbortUpdate>,
     options?: ICreateOrUpdateOptions<T>,
-  ): Promise<T | undefined>;
+  ): Promise<R | undefined>;
 
-  public async createOrUpdateUsing(
+  public async createOrUpdateUsing<R extends BaseModel<T>>(
     id: string,
-    updateFn: (previous: T | undefined) => Thenable<T | typeof AbortUpdate>,
+    updateFn: (previous: T | undefined) => Thenable<R | typeof AbortUpdate>,
     { initialValue, retries = 3, mustFind = false, ...reqOps }: ICreateOrUpdateOptions<T> = {},
-  ): Promise<T | undefined> {
+  ): Promise<R | undefined> {
     for (let i = 0; ; i++) {
       let model = initialValue;
       if (!model) {
@@ -115,7 +113,7 @@ export class Partition<T extends BaseModel<unknown>> {
 
       try {
         await updated.save(reqOps, this.container);
-        return model;
+        return updated;
       } catch (e) {
         if (e.code === 412 && i < retries) {
           // etag precondition failed

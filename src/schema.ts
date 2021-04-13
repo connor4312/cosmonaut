@@ -4,7 +4,10 @@ export interface ISchemaField {
   partitionKey?: boolean;
 }
 
-export type SchemaMap<T> = { [key in keyof T]: ISchemaField };
+type SchemaMap<T> = { [key in keyof T]: ISchemaField };
+
+// Dangerous types lie ahead. This place is not a place of honor. No highly
+// esteemed deed is commemorated here. Nothing valued is here.
 
 const concat = <T>(arr: ReadonlyArray<T> | undefined, ...items: T[]) =>
   arr ? arr.concat(...items) : items;
@@ -27,7 +30,7 @@ type CosmosIndexPathImpl<T, K extends keyof T> = K extends string
  * A generic type that, given an object, produces the types of all valid paths
  * in the object for indexing purposes.
  */
-export type CosmosIndexPath<T> = CosmosIndexPathImpl<T, keyof T> | '/*';
+export type CosmosIndexPath<T> = CosmosIndexPathImpl<Required<T>, keyof T> | '/*';
 
 type CosmosSimplePathImpl<T, K extends keyof T> = K extends string
   ? T[K] extends Array<unknown>
@@ -41,12 +44,45 @@ type CosmosSimplePathImpl<T, K extends keyof T> = K extends string
  * A generic type that, given an object, produces the types of all valid paths
  * in the object for unique and partition key constraints.
  */
-export type CosmosSimplePath<T> = CosmosSimplePathImpl<T, keyof T>;
+export type CosmosSimplePath<T> = CosmosSimplePathImpl<Required<T>, keyof T>;
 
+/**
+ * Helper that extracts the interface a given schema.
+ *
+ * ```ts
+ * type User = InterfaceForSchema<typeof userCollection>;
+ *
+ * const user: User = {
+ *   username: 'Connor'
+ * };
+ * ```
+ */
+export type InterfaceForSchema<T> = T extends Schema<infer I> ? I : never;
+
+/**
+ * The Schema describes a collection in Cosmos DB. It's a fluent-style builder
+ * where you define all the fields, which are passed into the {@link Model}.
+ * For a fully-type TypeScript consumer, you could provide:
+ *
+ * ```ts
+ * import { createSchema, asType } from 'cosmonaut';
+ *
+ * const schema = createSchema('users')
+ *   // note that IDs are defined implicity:
+ *   .partitionKey('/id')
+ *   // the "asType" helper provides type information to the type system.
+ *   .field('username', asType<string>())
+ *   .field('favoriteColors', asType<string[]>())
+ *   .field('favoriteCities', asType<{ name: string; country: string }[]>())
+ *   .field('address', asType<{ street: string; postal: number }>())
+ * ```
+ */
 export class Schema<T> {
   constructor(
     public readonly schemaMap: SchemaMap<T>,
-    public readonly definition: Cosmos.ContainerRequest,
+    public readonly definition: Cosmos.ContainerRequest & {
+      partitionKey?: Cosmos.PartitionKeyDefinition;
+    },
   ) {}
 
   /**
@@ -65,7 +101,7 @@ export class Schema<T> {
   public field<K extends string>(
     name: K,
     fieldConfig?: ISchemaField,
-  ): Schema<T & { [K_ in K]: unknown }>;
+  ): Schema<T & { [K_ in K]?: unknown }>;
 
   /**
    * Adds a new field to the schema.
@@ -79,7 +115,11 @@ export class Schema<T> {
     name: K,
     asType: AsType<TField>,
     fieldConfig?: ISchemaField,
-  ): Schema<T & { [K_ in K]: TField }>;
+  ): Schema<
+    TField extends OptionalType<infer TConcrete>
+      ? T & { [K_ in K]?: TConcrete }
+      : T & { [K_ in K]: TField }
+  >;
 
   /**
    * Adds a new field to the schema.
@@ -91,13 +131,17 @@ export class Schema<T> {
     name: K,
     typeOrConfig?: AsType<TField> | ISchemaField,
     fieldConfig?: ISchemaField,
-  ): Schema<T & { [K_ in K]: TField }> {
+  ) {
     const config: ISchemaField =
       !!typeOrConfig && !(typeOrConfig instanceof AsType) ? typeOrConfig : fieldConfig ?? {};
     const merged = {
       ...this.schemaMap,
       [name]: config,
-    } as SchemaMap<T & { [K_ in K]: TField }>;
+    } as SchemaMap<
+      TField extends OptionalType<infer TConcrete>
+        ? T & { [K_ in K]?: TConcrete }
+        : T & { [K_ in K]: TField }
+    >;
 
     return new Schema(merged, this.definition);
   }
@@ -184,10 +228,13 @@ export class Schema<T> {
    *
    * @see https://docs.microsoft.com/en-us/azure/cosmos-db/partitioning-overview
    */
-  public partitionKey(path: CosmosSimplePath<T>) {
+  public partitionKey(path: CosmosSimplePath<T>, partitionKeyCanBeLong = false) {
     return new Schema(this.schemaMap, {
       ...this.definition,
-      partitionKey: path,
+      partitionKey: {
+        paths: [path],
+        version: partitionKeyCanBeLong ? 2 : 1,
+      },
     });
   }
 
@@ -235,10 +282,20 @@ export class Schema<T> {
   }
 }
 
-class AsType<T> {
+class OptionalType<T> {
   declare value: T;
+  declare optional: true;
 }
 
+class AsType<T> {
+  declare value: T;
+
+  public optional() {
+    return new AsType<OptionalType<T>>();
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const lookupCosmosPath = (object: any, path: string): unknown => {
   for (const part of path.slice(1).split('/')) {
     object = object?.[part];

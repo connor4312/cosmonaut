@@ -1,13 +1,15 @@
 import { GeospatialType } from '@azure/cosmos';
-import { asType, createSchema } from './schema';
+import { asType, createSchema, InterfaceForSchema } from './schema';
 
 describe('schema', () => {
   const makeTestSchema = () =>
     createSchema('users')
+      .partitionKey('/id')
       .field('username', asType<string>())
       .field('favoriteColors', asType<string[]>())
       .field('favoriteCities', asType<{ name: string; country: string }[]>())
-      .field('address', asType<{ street: string; postal: number }>());
+      .field('address', asType<{ street: string; postal: number }>().optional());
+
   it('validates index paths', () => {
     const schema = makeTestSchema();
 
@@ -162,5 +164,19 @@ describe('schema', () => {
       id: 'users',
       geospatialConfig: { type: GeospatialType.Geography },
     });
+  });
+
+  it('extracts schema type', () => {
+    const schema = makeTestSchema();
+    type User = InterfaceForSchema<typeof schema>;
+
+    const user: User = {
+      id: '42',
+      username: 'connor',
+      favoriteCities: [{ country: 'a', name: 'b' }],
+      favoriteColors: ['blue'],
+    };
+
+    expect(user).toBeTruthy();
   });
 });
