@@ -1,98 +1,26 @@
 import type * as Cosmos from '@azure/cosmos';
-import { Container } from './container';
-import { AbortUpdate, ICreateOrUpdateOptions, Partition } from './partition';
-import { lookupCosmosPath, Schema } from './schema';
-import { mapCosmosResourceResponse, Thenable } from './types';
+import { Partition } from './partition';
+import { BasicSchema, lookupCosmosPath } from './schema';
+import { mapCosmosResourceResponse } from './types';
 
-export interface IModelCtor<T extends { id: string }> {
-  new (props: T & Partial<Cosmos.Resource>): BaseModel<T> & T;
+export type ConstructorFor<TProps, TThis> = { new (props: TProps): TThis };
 
-  /**
-   * Updates or creats a model using the given function. The function will
-   * be retried automaticaly in case a conflict happens, so could be called
-   * multiple times.
-   *
-   * You should either make changes to the model in the callback, or create
-   * and return a new instance of the model.
-   *
-   * You can return the `AbortUpdate` symbol to cancel the operation.
-   *
-   * @param updateFn Function called to update or create a model.
-   * @param options Call options
-   */
-  createOrUpdateUsing<TCtor extends IModelCtor<T>>(
-    this: TCtor,
-    id: string,
-    partitionKey: string | number,
-    updateFn: (previous: InstanceType<TCtor> | undefined) => Thenable<InstanceType<TCtor>>,
-    options?: ICreateOrUpdateOptions<InstanceType<TCtor>>,
-  ): Promise<InstanceType<TCtor>>;
-
-  /**
-   * Updates or creats a model using the given function. The function will
-   * be retried automaticaly in case a conflict happens, so could be called
-   * multiple times.
-   *
-   * You should either make changes to the model in the callback, or create
-   * and return a new instance of the model.
-   *
-   * You can return the `AbortUpdate` symbol to cancel the operation.
-   *
-   * @param updateFn Function called to update or create a model.
-   * @param options Call options
-   */
-  createOrUpdateUsing<TCtor extends IModelCtor<T>>(
-    this: TCtor,
-    id: string,
-    partitionKey: string | number,
-    updateFn: (
-      previous: InstanceType<TCtor> | undefined,
-    ) => Thenable<InstanceType<TCtor> | typeof AbortUpdate>,
-    options?: ICreateOrUpdateOptions<InstanceType<TCtor>>,
-  ): Promise<InstanceType<TCtor> | undefined>;
-
-  /**
-   * Starts running an operation for an item in a partition.
-   */
-  partition(partitionKey: string | number, container?: Cosmos.Container): Partition<T>;
-
-  /**
-   * Starts running an operation for an item in a partition.
-   */
-  container(container?: Cosmos.Container): Container<T>;
-
-  /**
-   * Collection schema.
-   */
-  schema: Schema<T>;
-
-  /**
-   * Default number of retries to make when saving a document using
-   * `createOrUpdateUsing` and similar methods.
-   */
-  defaultConflictRetries: number;
-
-  /**
-   * Associated Cosmos container.
-   */
-  cosmosContainer?: Cosmos.Container;
-
-  /**
-   * Associated Cosmos DB database.
-   */
-  cosmosDb?: Cosmos.Database;
+export interface ModelConstructor<T extends { id: string }> {
+  new (props: T & Partial<Cosmos.Resource>): BaseModel<T>;
 }
 
 export abstract class BaseModel<T extends { id: string }> {
   /**
-   * Gets the schema that defines this collection and model.
+   * Schema for this model.
    */
-  protected declare schema: Schema<T>;
+  public abstract schema: BasicSchema<T>;
 
   /**
    * Gets a partition accessor for the colleciton.
    */
-  protected declare partition: (container: Cosmos.Container) => Partition<T>;
+  public abstract partition: (
+    container?: Cosmos.Container,
+  ) => Partition<T, ConstructorFor<T, this>>;
 
   /**
    * Default container for the model. This can be populated by hand, or by
@@ -100,41 +28,20 @@ export abstract class BaseModel<T extends { id: string }> {
    */
   public static cosmosDb?: Cosmos.Database;
 
+  /**
+   * Default Cosmos DB container for the model. This can be populated by hand,
+   * or by the `connectModels()` helper function.
+   */
+  public static cosmosContainer?: Cosmos.Container;
+
   /** @see IBaseModelCtor.defaultConflictRetries */
   public static defaultConflictRetries = 3;
 
-  /** @see IBaseModelCtor.createOrUpdateUsing */
-  public static async createOrUpdateUsing<T extends { id: string }, TCtor extends IModelCtor<T>>(
-    this: TCtor,
-    id: string,
-    partitionKey: string | number,
-    updateFn: (
-      previous: InstanceType<TCtor> | undefined,
-    ) => Thenable<InstanceType<TCtor> | typeof AbortUpdate>,
-    options?: ICreateOrUpdateOptions<InstanceType<TCtor>>,
-  ): Promise<InstanceType<TCtor> | undefined> {
-    const created = await this.partition(partitionKey).createOrUpdateUsing(
-      id,
-      async m => {
-        const result = await updateFn(m ? (new this(m) as InstanceType<TCtor>) : undefined);
-        if (result === AbortUpdate) {
-          return result;
-        }
-
-        await result.beforePersist();
-
-        if (m) {
-          await result.beforeCreate();
-        } else {
-          await result.beforeUpdate();
-        }
-
-        return result;
-      },
-      { ...options, mustFind: true },
-    );
-
-    return created as InstanceType<TCtor> | undefined;
+  /**
+   * Gets the model ID. This is unique within a Cosmos DB partition.
+   */
+  public get id() {
+    return this.props.id;
   }
 
   /**
@@ -157,7 +64,15 @@ export abstract class BaseModel<T extends { id: string }> {
     return this.props._etag;
   }
 
-  constructor(protected props: T & Partial<Cosmos.Resource>) {}
+  /**
+   * Raw model properties. These are also accessible on the instance directly,
+   * but you need to manually declare them if you use TypeScript.
+   */
+  public props: T & Partial<Cosmos.Resource>;
+
+  constructor(props: T & Partial<Cosmos.Resource>) {
+    this.props = props;
+  }
 
   /**
    * Lifecycle hook called before the model is persisted. This is called
@@ -264,54 +179,6 @@ export abstract class BaseModel<T extends { id: string }> {
   }
 
   /**
-   * Updates a model using the given function. The function will
-   * be retried automaticaly in case a conflict happens, so could be called
-   * multiple times.
-   *
-   * Note that when calling this, the properties that were previously on
-   * the model may be re-set if the model is reread from the database
-   * as a result of a conflict. Therefore, you should make sure to have all
-   * mutations happen inside the `updateFn` method, not before it.
-   *
-   * You can return the `AbortUpdate` symbol to cancel the operation.
-   *
-   * @param updateFn Function called to update the model. Should return the
-   * model after making modifications to it.
-   * @param options Call options
-   */
-  public async updateUsing(
-    updateFn: (previous: this) => Thenable<this | typeof AbortUpdate>,
-    options?: ICreateOrUpdateOptions<this>,
-    container = assertContainer(this),
-  ): Promise<this> {
-    const updated = await this.partition(container).createOrUpdateUsing(
-      this.props.id,
-      async m => {
-        this.props = m!;
-        const result = await updateFn(this);
-        if (result === AbortUpdate) {
-          return result;
-        }
-
-        await this.beforePersist();
-        await this.beforeUpdate();
-        return result;
-      },
-      { ...options, initialValue: this.props, mustFind: true },
-    );
-
-    if (!updated) {
-      return this;
-    }
-
-    this.props = (updated as this).props;
-    await this.afterPersist();
-    await this.afterUpdate();
-
-    return this;
-  }
-
-  /**
    * Gets the value for the partition key in the current model.
    */
   public partitionKey() {
@@ -339,10 +206,9 @@ export const connectModels = (connection: Cosmos.Database) => {
   BaseModel.cosmosDb = connection;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const assertContainer = (t: any): Cosmos.Container => {
   if (t instanceof BaseModel) {
-    t = t.constructor as IModelCtor<{ id: string }>;
+    t = t.constructor as typeof BaseModel;
   }
 
   if (!t.cosmosContainer) {

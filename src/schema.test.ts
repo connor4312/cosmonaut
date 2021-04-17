@@ -44,16 +44,19 @@ describe('schema', () => {
     const schema = makeTestSchema();
     expect(schema.definition).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
     });
 
     expect(schema.enableTtlWithoutDefault().definition).toEqual({
       id: 'users',
       defaultTtl: -1,
+      partitionKey: { paths: ['/id'], version: 1 },
     });
 
     expect(schema.ttl(1234).definition).toEqual({
       id: 'users',
       defaultTtl: 1234,
+      partitionKey: { paths: ['/id'], version: 1 },
     });
   });
 
@@ -61,6 +64,7 @@ describe('schema', () => {
     const schema = makeTestSchema();
     expect(schema.removeAllFromIndex().definition).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       indexingPolicy: {
         excludedPaths: [
           {
@@ -72,6 +76,7 @@ describe('schema', () => {
 
     expect(schema.removeFromIndex('/address/*').definition).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       indexingPolicy: {
         excludedPaths: [
           {
@@ -83,6 +88,7 @@ describe('schema', () => {
 
     expect(schema.removeFromIndex('/address/*').removeFromIndex('/username/?').definition).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       indexingPolicy: {
         excludedPaths: [
           {
@@ -105,6 +111,7 @@ describe('schema', () => {
       }).definition,
     ).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       indexingPolicy: {
         includedPaths: [
           {
@@ -125,6 +132,7 @@ describe('schema', () => {
     const schema = makeTestSchema();
     expect(schema.unique('/username').definition).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       uniqueKeyPolicy: { uniqueKeys: [{ paths: ['/username'] }] },
     });
 
@@ -132,6 +140,7 @@ describe('schema', () => {
       schema.unique('/username').unique('/address/postal', '/address/street').definition,
     ).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       uniqueKeyPolicy: {
         uniqueKeys: [{ paths: ['/username'] }, { paths: ['/address/postal', '/address/street'] }],
       },
@@ -139,10 +148,13 @@ describe('schema', () => {
   });
 
   it('partitionKey', () => {
-    const schema = makeTestSchema();
-    expect(schema.partitionKey('/username').definition).toEqual({
+    expect(makeTestSchema().definition).toEqual({
       id: 'users',
-      partitionKey: { paths: ['/username'] },
+      partitionKey: { paths: ['/id'], version: 1 },
+    });
+    expect(makeTestSchema().partitionKey('/id', true).definition).toEqual({
+      id: 'users',
+      partitionKey: { paths: ['/id'], version: 2 },
     });
   });
 
@@ -154,6 +166,7 @@ describe('schema', () => {
       }).definition,
     ).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       conflictResolutionPolicy: { conflictResolutionPath: '/username' },
     });
   });
@@ -162,6 +175,7 @@ describe('schema', () => {
     const schema = makeTestSchema();
     expect(schema.setGeospatialConfig(GeospatialType.Geography).definition).toEqual({
       id: 'users',
+      partitionKey: { paths: ['/id'], version: 1 },
       geospatialConfig: { type: GeospatialType.Geography },
     });
   });

@@ -1,5 +1,5 @@
 import type * as Cosmos from '@azure/cosmos';
-import { assertContainer, BaseModel, IModelCtor } from './baseModel';
+import { assertContainer, BaseModel, ConstructorFor, ModelConstructor } from './baseModel';
 import { Container } from './container';
 import { Partition } from './partition';
 import { Schema } from './schema';
@@ -29,17 +29,28 @@ import { Schema } from './schema';
  * ```
  */
 export const Model = <T extends { id: string }>(schema: Schema<T>) => {
-  class ActualModel extends BaseModel<T> {
-    protected readonly schema = schema;
-    protected readonly partition = (container: Cosmos.Container) =>
-      new Partition<T>(container, this.partitionKey());
+  const ActualModel = class extends BaseModel<T> {
+    public readonly schema = schema;
 
-    /** See {@link IActualModelCtor.partition} */
-    public static partition(partitionKey: string | number, container = assertContainer(this)) {
-      return new Partition<T>(container, partitionKey);
+    public readonly partition: (
+      container?: Cosmos.Container,
+    ) => Partition<T, ConstructorFor<T, this>> = (container = assertContainer(this)) =>
+      new Partition(container, this.constructor as ConstructorFor<T, this>, this.partitionKey());
+
+    /**
+     * Starts running an operation for an item in a partition.
+     */
+    public static partition<TCtor extends ModelConstructor<T>>(
+      this: TCtor,
+      partitionKey: string | number,
+      container = assertContainer(this),
+    ): Partition<T, TCtor> {
+      return new Partition<T, TCtor>(container, this, partitionKey);
     }
 
-    /** See {@link IActualModelCtor.container} */
+    /**
+     * Starts running an operation for an item in a partition.
+     */
     public static container(container = assertContainer(this)) {
       return new Container(this.schema, container);
     }
@@ -48,7 +59,7 @@ export const Model = <T extends { id: string }>(schema: Schema<T>) => {
      * Original schema for the model. Note that this is immutable.
      */
     public static readonly schema = schema;
-  }
+  };
 
   for (const [key] of Object.entries(schema.schemaMap)) {
     Object.defineProperty(ActualModel.prototype, key, {
@@ -63,5 +74,5 @@ export const Model = <T extends { id: string }>(schema: Schema<T>) => {
     });
   }
 
-  return (ActualModel as unknown) as IModelCtor<T>;
+  return ActualModel;
 };

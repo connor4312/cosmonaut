@@ -1,7 +1,7 @@
 {
-  "name": "cosmonaut",
+  "name": "cosmonaut-odm",
   "version": "0.1.0",
-  "description": "Azure Cosmos DB ORM",
+  "description": "Azure Cosmos DB ODM",
   "main": "dist/index.js",
   "sideEffects": false,
   "scripts": {
@@ -11,6 +11,7 @@
     "compile": "rimraf dist && tsc",
     "test": "npm run compile && concurrently \"npm:test:*\"",
     "test:unit": "jest",
+    "test:types": "tsd",
     "test:lint": "eslint \"src/**/*.ts\"",
     "test:fmt": "prettier --list-different \"src/**/*.ts\" \"*.md\"",
     "fmt": "prettier --write \"src/**/*.ts\" \"*.md\" && npm run test:lint -- --fix"
@@ -46,13 +47,16 @@
   "devDependencies": {
     "@azure/cosmos": "^3.9.3",
     "@types/jest": "^26.0.22",
+    "@types/node": "^14.14.41",
     "@typescript-eslint/eslint-plugin": "^4.22.0",
     "@typescript-eslint/parser": "^4.22.0",
+    "@zeit/cosmosdb-server": "^0.13.1",
     "concurrently": "^6.0.2",
     "eslint": "^7.24.0",
     "jest": "^26.6.3",
     "prettier": "^2.2.1",
     "rimraf": "^3.0.2",
-    "typescript": "^4.2.4"
+    "tsd": "^0.14.0",
+    "typescript": "4.3.0-beta"
   }
 }

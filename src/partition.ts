@@ -1,12 +1,7 @@
 import type * as Cosmos from '@azure/cosmos';
-import { BaseModel } from './baseModel';
-import { IResourceResponse, mapCosmosResourceResponse, Thenable } from './types';
-
-/**
- * Can be returned from {@link Partition.createOrUpdateUsing} to cancel the
- * update.
- */
-export const AbortUpdate = Symbol('AbortUpdate');
+import { ModelConstructor } from './baseModel';
+import { CosmosError } from './errors';
+import { IResourceResponse, mapCosmosResourceResponse } from './types';
 
 export interface ICreateOrUpdateOptions<T> extends Cosmos.RequestOptions {
   initialValue?: T;
@@ -14,9 +9,10 @@ export interface ICreateOrUpdateOptions<T> extends Cosmos.RequestOptions {
   mustFind?: boolean;
 }
 
-export class Partition<T extends { id: string }> {
+export class Partition<T extends { id: string }, TCtor extends ModelConstructor<T>> {
   constructor(
-    private readonly container: Cosmos.Container,
+    public readonly container: Cosmos.Container,
+    public readonly ctor: TCtor,
     private partitionKey: string | number,
   ) {}
 
@@ -38,7 +34,7 @@ export class Partition<T extends { id: string }> {
   /**
    * Looks up a model by ID.
    */
-  public async find(id: string, options?: Cosmos.RequestOptions) {
+  public async find(id: string, options?: Cosmos.RequestOptions): Promise<InstanceType<TCtor>> {
     return this.findWithDetails(id, options).then(r => r.resource);
   }
 
@@ -48,9 +44,22 @@ export class Partition<T extends { id: string }> {
   public async findWithDetails(
     id: string,
     options?: Cosmos.RequestOptions,
-  ): Promise<IResourceResponse<T>> {
+  ): Promise<IResourceResponse<InstanceType<TCtor>>> {
     const response = await this.container.item(id, this.partitionKey).read<T>(options);
-    return mapCosmosResourceResponse(response, response.resource!);
+    if (response.resource === undefined) {
+      throw new CosmosError({
+        ...response,
+        code: response.statusCode,
+        substatus: response.substatus,
+        activityId: response.activityId,
+        headers: response.headers,
+      });
+    }
+
+    return mapCosmosResourceResponse(
+      response,
+      new this.ctor(response.resource) as InstanceType<TCtor>,
+    );
   }
 
   /**
@@ -58,71 +67,5 @@ export class Partition<T extends { id: string }> {
    */
   public async delete(id: string, options?: Cosmos.RequestOptions) {
     return this.container.item(id, this.partitionKey).delete(options);
-  }
-
-  /**
-   * Creates or updates a model using the given function. The function will
-   * be retried automaticaly in case a conflict happens, so could be called
-   * multiple times.
-   *
-   * @param id ID of the model to create or update
-   * @param updateFn Function called to update the model. Should return the
-   * model after making modifications to it.
-   * @param options
-   */
-  public createOrUpdateUsing<R extends BaseModel<T>>(
-    id: string,
-    updateFn: (previous: T | undefined) => Thenable<R>,
-    options?: ICreateOrUpdateOptions<T>,
-  ): Promise<R>;
-
-  /**
-   * Creates or updates a model using the given function. The function will
-   * be retried automaticaly in case a conflict happens, so could be called
-   * multiple times.
-   *
-   * You can return the `AbortUpdate` symbol to cancel the operation and
-   * return nothing.
-   *
-   * @param id ID of the model to create or update
-   * @param updateFn Function called to update the model. Should return the
-   * model after making modifications to it.
-   * @param options Call options
-   */
-  public createOrUpdateUsing<R extends BaseModel<T>>(
-    id: string,
-    updateFn: (previous: T | undefined) => Thenable<R | typeof AbortUpdate>,
-    options?: ICreateOrUpdateOptions<T>,
-  ): Promise<R | undefined>;
-
-  public async createOrUpdateUsing<R extends BaseModel<T>>(
-    id: string,
-    updateFn: (previous: T | undefined) => Thenable<R | typeof AbortUpdate>,
-    { initialValue, retries = 3, mustFind = false, ...reqOps }: ICreateOrUpdateOptions<T> = {},
-  ): Promise<R | undefined> {
-    for (let i = 0; ; i++) {
-      let model = initialValue;
-      if (!model) {
-        model = await (mustFind ? this.find(id, reqOps) : this.maybeFind(id, reqOps));
-      }
-
-      const updated = await updateFn(model);
-      if (updated === AbortUpdate) {
-        return undefined;
-      }
-
-      try {
-        await updated.save(reqOps, this.container);
-        return updated;
-      } catch (e) {
-        if (e.code === 412 && i < retries) {
-          // etag precondition failed
-          initialValue = undefined;
-          continue;
-        }
-
-        throw e;
-      }
-    }
   }
 }

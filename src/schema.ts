@@ -57,7 +57,30 @@ export type CosmosSimplePath<T> = CosmosSimplePathImpl<Required<T>, keyof T>;
  * };
  * ```
  */
-export type InterfaceForSchema<T> = T extends Schema<infer I> ? I : never;
+export type InterfaceForSchema<T> = T extends BasicSchema<infer I> ? I : never;
+
+/**
+ * Basic, static schema object that can be used to create a class instance. The
+ * presence of this is purely to have a static version without the typed
+ * strings, since that seems to lead quickly to "Type instantiation is
+ * excessively deep and possibly infinite.ts(2589)" errors, at least
+ * as of TS 4.3.0-beta.
+ */
+export class BasicSchema<T> {
+  constructor(
+    public readonly schemaMap: SchemaMap<T>,
+    public readonly definition: Cosmos.ContainerRequest & {
+      partitionKey?: Cosmos.PartitionKeyDefinition;
+    },
+  ) {}
+
+  /**
+   * Gets the ID of the Cosmos DB container.
+   */
+  public get id() {
+    return this.definition.id!;
+  }
+}
 
 /**
  * The Schema describes a collection in Cosmos DB. It's a fluent-style builder
@@ -77,21 +100,7 @@ export type InterfaceForSchema<T> = T extends Schema<infer I> ? I : never;
  *   .field('address', asType<{ street: string; postal: number }>())
  * ```
  */
-export class Schema<T> {
-  constructor(
-    public readonly schemaMap: SchemaMap<T>,
-    public readonly definition: Cosmos.ContainerRequest & {
-      partitionKey?: Cosmos.PartitionKeyDefinition;
-    },
-  ) {}
-
-  /**
-   * Gets the ID of the Cosmos DB container.
-   */
-  public get id() {
-    return this.definition.id!;
-  }
-
+export class Schema<T = { id: string }> extends BasicSchema<T> {
   /**
    * Adds a new field to the schema.
    * @param name the name of the field
@@ -295,7 +304,6 @@ class AsType<T> {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const lookupCosmosPath = (object: any, path: string): unknown => {
   for (const part of path.slice(1).split('/')) {
     object = object?.[part];
