@@ -1,6 +1,7 @@
 import type * as Cosmos from '@azure/cosmos';
 import { ModelConstructor } from './baseModel';
 import { CosmosError } from './errors';
+import { BasicSchema, transformFromDatabase } from './schema';
 import { IResourceResponse, mapCosmosResourceResponse } from './types';
 
 export interface ICreateOrUpdateOptions<T> extends Cosmos.RequestOptions {
@@ -13,6 +14,7 @@ export class Partition<T extends { id: string }, TCtor extends ModelConstructor<
   constructor(
     public readonly container: Cosmos.Container,
     public readonly ctor: TCtor,
+    private readonly schema: BasicSchema<T>,
     private partitionKey: string | number,
   ) {}
 
@@ -45,7 +47,7 @@ export class Partition<T extends { id: string }, TCtor extends ModelConstructor<
     id: string,
     options?: Cosmos.RequestOptions,
   ): Promise<IResourceResponse<InstanceType<TCtor>>> {
-    const response = await this.container.item(id, this.partitionKey).read<T>(options);
+    const response = await this.container.item(id, this.partitionKey).read(options);
     if (response.resource === undefined) {
       throw new CosmosError({
         ...response,
@@ -58,7 +60,7 @@ export class Partition<T extends { id: string }, TCtor extends ModelConstructor<
 
     return mapCosmosResourceResponse(
       response,
-      new this.ctor(response.resource) as InstanceType<TCtor>,
+      new this.ctor(transformFromDatabase(this.schema, response.resource)) as InstanceType<TCtor>,
     );
   }
 

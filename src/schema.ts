@@ -1,10 +1,19 @@
 import type * as Cosmos from '@azure/cosmos';
+import { JSONSchema7 } from 'json-schema';
+import { mapValues } from './util';
 
-export interface ISchemaField {
-  partitionKey?: boolean;
+export interface ISchemaField<T> extends JSONSchema7 {
+  isRequired?: boolean;
+  transform?: Transform<unknown, T>;
 }
 
-type SchemaMap<T> = { [key in keyof T]: ISchemaField };
+interface IFieldConfig<T> {
+  schema: JSONSchema7;
+  required: boolean;
+  transform?: Transform<unknown, T>;
+}
+
+type SchemaMap<T> = { [K in keyof T]: IFieldConfig<T[K]> };
 
 // Dangerous types lie ahead. This place is not a place of honor. No highly
 // esteemed deed is commemorated here. Nothing valued is here.
@@ -80,6 +89,18 @@ export class BasicSchema<T> {
   public get id() {
     return this.definition.id!;
   }
+
+  /**
+   * Gets a JSON schema representing the configured Cosmos schema.
+   */
+  public get jsonSchema(): JSONSchema7 {
+    return {
+      type: 'object',
+      required: Object.keys(this.schemaMap).filter(k => this.schemaMap[k as keyof T].required),
+      additionalProperties: false,
+      properties: mapValues(this.schemaMap, v => v.schema ?? {}),
+    };
+  }
 }
 
 /**
@@ -109,7 +130,7 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
    */
   public field<K extends string>(
     name: K,
-    fieldConfig?: ISchemaField,
+    fieldConfig?: ISchemaField<unknown>,
   ): Schema<T & { [K_ in K]?: unknown }>;
 
   /**
@@ -123,7 +144,7 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
   public field<K extends string, TField>(
     name: K,
     asType: AsType<TField>,
-    fieldConfig?: ISchemaField,
+    fieldConfig?: ISchemaField<TField>,
   ): Schema<
     TField extends OptionalType<infer TConcrete>
       ? T & { [K_ in K]?: TConcrete }
@@ -138,15 +159,28 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
    */
   public field<K extends string, TField>(
     name: K,
-    typeOrConfig?: AsType<TField> | ISchemaField,
-    fieldConfig?: ISchemaField,
+    typeOrConfig?: AsType<TField> | ISchemaField<TField>,
+    fieldConfig?: ISchemaField<TField>,
   ) {
-    const config: ISchemaField =
-      !!typeOrConfig && !(typeOrConfig instanceof AsType) ? typeOrConfig : fieldConfig ?? {};
-    const merged = {
+    let type: AsType<TField> | undefined;
+    let config: Partial<ISchemaField<TField>> | undefined;
+    if (typeOrConfig instanceof AsType) {
+      type = typeOrConfig;
+      config = fieldConfig;
+    } else if (!!typeOrConfig) {
+      config = typeOrConfig;
+    }
+
+    const { isRequired, ...schema } = config ?? {};
+
+    const merged = ({
       ...this.schemaMap,
-      [name]: config,
-    } as SchemaMap<
+      [name]: {
+        transform: config?.transform,
+        required: isRequired || type?.isOptional === false,
+        schema,
+      } as IFieldConfig<TField>,
+    } as unknown) as SchemaMap<
       TField extends OptionalType<infer TConcrete>
         ? T & { [K_ in K]?: TConcrete }
         : T & { [K_ in K]: TField }
@@ -291,7 +325,53 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
   }
 }
 
-class OptionalType<T> {
+/**
+ * A Transform can be passed in the definition of a schema field to create
+ * a mapping between what is stored in the database, and what is stored in
+ * the model. For example, you might store an array of strings in Cosmos DB,
+ * but represent it as a Set in the application. This could be handled like so:
+ *
+ * ```ts
+ * schema.field('favoriteColors', asType<string[]>, {
+ *   type: 'array',
+ *   uniqueValues: true,
+ *   transform: new Transform(
+ *     storeValue => new Set(storeValue),
+ *     appValue => Array.from(appValue),
+ *   ),
+ * });
+ * ```
+ */
+export class Transform<TStoredValue, TAppValue> {
+  constructor(
+    public deserialize: (storedValue: TStoredValue) => TAppValue,
+    public serialize: (applicationValue: TAppValue) => TStoredValue,
+  ) {}
+}
+
+export const transformFromDatabase = <T>(
+  schema: BasicSchema<T>,
+  values: Record<string, unknown>,
+): T => {
+  const mapped = mapValues(values, (value, key) => {
+    const transform = schema.schemaMap[key as keyof T]?.transform;
+    return transform ? transform.deserialize(value) : value;
+  });
+
+  return (mapped as unknown) as T;
+};
+
+export const transformToDatabase = <T>(
+  schema: BasicSchema<T>,
+  props: T,
+): Record<keyof T, unknown> => {
+  return mapValues(props, (value, key) => {
+    const transform = schema.schemaMap[key]?.transform;
+    return transform ? transform.serialize(value) : value;
+  });
+};
+
+declare class OptionalType<T> {
   declare value: T;
   declare optional: true;
 }
@@ -299,8 +379,10 @@ class OptionalType<T> {
 class AsType<T> {
   declare value: T;
 
+  constructor(public readonly isOptional: boolean) {}
+
   public optional() {
-    return new AsType<OptionalType<T>>();
+    return new AsType<OptionalType<T>>(true);
   }
 }
 
@@ -313,6 +395,11 @@ export const lookupCosmosPath = (object: any, path: string): unknown => {
 };
 
 export const createSchema = (containerName: string) =>
-  new Schema<{ id: string }>({ id: {} }, { id: containerName });
+  new Schema<{ id: string }>(
+    { id: { required: true, schema: { type: 'string' } } },
+    { id: containerName },
+  );
 
-export const asType = <T>() => new AsType<T>();
+export function asType<T>() {
+  return new AsType<T>(false);
+}

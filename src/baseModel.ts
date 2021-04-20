@@ -1,7 +1,14 @@
 import type * as Cosmos from '@azure/cosmos';
+import Ajv from 'ajv';
 import { Partition } from './partition';
-import { BasicSchema, lookupCosmosPath } from './schema';
+import {
+  BasicSchema,
+  lookupCosmosPath,
+  transformFromDatabase,
+  transformToDatabase,
+} from './schema';
 import { mapCosmosResourceResponse } from './types';
+import { mustValidate, once } from './util';
 
 export type ConstructorFor<TProps, TThis> = { new (props: TProps): TThis };
 
@@ -16,7 +23,7 @@ export abstract class BaseModel<T extends { id: string }> {
   public abstract schema: BasicSchema<T>;
 
   /**
-   * Gets a partition accessor for the colleciton.
+   * Gets a partition accessor for the collection.
    */
   public abstract partition: (
     container?: Cosmos.Container,
@@ -34,8 +41,13 @@ export abstract class BaseModel<T extends { id: string }> {
    */
   public static cosmosContainer?: Cosmos.Container;
 
-  /** @see IBaseModelCtor.defaultConflictRetries */
-  public static defaultConflictRetries = 3;
+  /**
+   * Instance of [ajv](https://ajv.js.org/) use for validation. You can modify
+   * or replace this as needed, to add custom validators for example.
+   * Modifications must happen before you start using models, since validation
+   * schemas will be compiled and cached once they're used.
+   */
+  public static ajv = new Ajv();
 
   /**
    * Gets the model ID. This is unique within a Cosmos DB partition.
@@ -124,8 +136,12 @@ export abstract class BaseModel<T extends { id: string }> {
   public async create(options?: Cosmos.RequestOptions, container = assertContainer(this)) {
     await this.beforeCreate();
     await this.beforePersist();
-    const response = await container.items.create<T>(this.props, options);
-    this.props = response.resource!;
+
+    const toCreate = transformToDatabase(this.schema, this.props);
+    mustValidate(this.getValidateFunction(), toCreate);
+    const response = await container.items.create(toCreate as Cosmos.ItemDefinition, options);
+    this.props = transformFromDatabase(this.schema, response.resource!);
+
     await this.afterPersist();
     await this.afterCreate();
 
@@ -141,7 +157,11 @@ export abstract class BaseModel<T extends { id: string }> {
   public async update(options?: Cosmos.RequestOptions, container = assertContainer(this)) {
     await this.beforeUpdate();
     await this.beforePersist();
-    const response = await container.items.upsert<T>(this.props, {
+
+    const toSave = transformToDatabase(this.schema, this.props);
+    mustValidate(this.getValidateFunction(), toSave);
+
+    const response = await container.items.upsert(toSave, {
       accessCondition:
         this.props._etag !== undefined
           ? {
@@ -151,7 +171,8 @@ export abstract class BaseModel<T extends { id: string }> {
           : undefined,
       ...options,
     });
-    this.props = response.resource!;
+    this.props = transformFromDatabase(this.schema, response.resource!);
+
     await this.afterPersist();
     await this.afterCreate();
 
@@ -197,6 +218,11 @@ export abstract class BaseModel<T extends { id: string }> {
 
     return value as string | number;
   }
+
+  /**
+   * Gets the JSON validation function for this model.
+   */
+  public readonly getValidateFunction = once(() => BaseModel.ajv.compile(this.schema.jsonSchema));
 }
 
 /**

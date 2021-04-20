@@ -58,5 +58,9 @@
     "rimraf": "^3.0.2",
     "tsd": "^0.14.0",
     "typescript": "4.3.0-beta"
+  },
+  "dependencies": {
+    "@types/json-schema": "^7.0.7",
+    "ajv": "^8.1.0"
   }
 }

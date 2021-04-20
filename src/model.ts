@@ -35,7 +35,12 @@ export const Model = <T extends { id: string }>(schema: Schema<T>) => {
     public readonly partition: (
       container?: Cosmos.Container,
     ) => Partition<T, ConstructorFor<T, this>> = (container = assertContainer(this)) =>
-      new Partition(container, this.constructor as ConstructorFor<T, this>, this.partitionKey());
+      new Partition(
+        container,
+        this.constructor as ConstructorFor<T, this>,
+        schema,
+        this.partitionKey(),
+      );
 
     /**
      * Starts running an operation for an item in a partition.
@@ -45,7 +50,7 @@ export const Model = <T extends { id: string }>(schema: Schema<T>) => {
       partitionKey: string | number,
       container = assertContainer(this),
     ): Partition<T, TCtor> {
-      return new Partition<T, TCtor>(container, this, partitionKey);
+      return new Partition<T, TCtor>(container, this, schema, partitionKey);
     }
 
     /**
