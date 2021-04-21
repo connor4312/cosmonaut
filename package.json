@@ -9,10 +9,9 @@
     "watch:tsc": "rimraf dist && tsc --watch",
     "watch:test": "jest --watchAll",
     "compile": "rimraf dist && tsc",
-    "test": "npm run compile && concurrently \"npm:test:*\"",
+    "test": "npm run compile && concurrently npm:test:unit npm:test:lint npm:test:fmt",
     "test:unit": "jest",
     "test:unit:emulator": "cross-env COSMONAUT_USE_EMULATOR=1 jest",
-    "test:types": "tsd",
     "test:lint": "eslint \"src/**/*.ts\"",
     "test:fmt": "prettier --list-different \"src/**/*.ts\" \"*.md\"",
     "fmt": "prettier --write \"src/**/*.ts\" \"*.md\" && npm run test:lint -- --fix"
