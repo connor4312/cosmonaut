@@ -4,12 +4,6 @@ import { CosmosError } from './errors';
 import { BasicSchema, transformFromDatabase } from './schema';
 import { IResourceResponse, mapCosmosResourceResponse } from './types';
 
-export interface ICreateOrUpdateOptions<T> extends Cosmos.RequestOptions {
-  initialValue?: T;
-  retries?: number;
-  mustFind?: boolean;
-}
-
 export class Partition<T extends { id: string }, TCtor extends ModelConstructor<T>> {
   constructor(
     public readonly container: Cosmos.Container,

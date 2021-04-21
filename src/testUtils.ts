@@ -4,11 +4,20 @@ import * as https from 'https';
 import { AddressInfo } from 'net';
 import { asType, createSchema, Model } from '.';
 import { connectModels } from './baseModel';
+import { Transform } from './schema';
 
 export const schema = createSchema('users')
   .partitionKey('/id')
   .field('username', asType<string>())
-  .field('favoriteColors', asType<string[]>())
+  .field('favoriteColors', asType<Set<string>>(), {
+    type: 'array',
+    maxItems: 3,
+    items: { type: 'string' },
+    transform: new Transform<string[], Set<string>>(
+      stored => new Set(stored),
+      app => Array.from(app),
+    ),
+  })
   .field('favoriteCities', asType<{ name: string; country: string }[]>().optional());
 
 export class User extends Model(schema) {
@@ -17,12 +26,16 @@ export class User extends Model(schema) {
   }
 }
 
-export const exampleUser = new User({ id: '1', favoriteColors: ['blue'], username: 'Connor' });
+export const exampleUser = new User({
+  id: '1',
+  favoriteColors: new Set(['blue']),
+  username: 'Connor',
+});
 
 export let client: CosmosClient | undefined;
 
 const dbName = 'cosmonauttest';
-const useEmulator = false;
+const useEmulator = process.env.COSMONAUT_USE_EMULATOR;
 
 let server: https.Server | undefined;
 

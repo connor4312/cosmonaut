@@ -8,18 +8,18 @@ import { exampleUser, User } from './testUtils';
   new User({});
 
   //@ts-expect-error
-  new User({ id: 1234, favoriteColors: [], username: 'Connor' });
+  new User({ id: 1234, favoriteColors: new Set(), username: 'Connor' });
 
   new User({
     id: '',
-    favoriteColors: [],
+    favoriteColors: new Set(),
     username: 'Connor',
     favoriteCities: [{ country: 'a', name: 'b' }],
   });
 
   new User({
     id: '',
-    favoriteColors: [],
+    favoriteColors: new Set(),
     username: 'Connor',
     //@ts-expect-error
     favoriteCities: [{ country: 'a', name: 'b', invalid: 3 }],

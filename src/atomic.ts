@@ -1,6 +1,27 @@
+import type * as Cosmos from '@azure/cosmos';
 import { assertContainer, BaseModel, ModelConstructor } from './baseModel';
-import { ICreateOrUpdateOptions, Partition } from './partition';
+import { Partition } from './partition';
 import { AbortUpdate, Thenable } from './types';
+
+/**
+ * Options for atomic operations.
+ */
+export interface IOptions<T> extends Cosmos.RequestOptions {
+  /**
+   * @private
+   */
+  initialValue?: T;
+
+  /**
+   * The number of times to retry the option on failure. Defaults to 3.
+   */
+  retries?: number;
+
+  /**
+   * @private
+   */
+  mustFind?: boolean;
+}
 
 /**
  * Updates a model using the given function. The function will
@@ -21,7 +42,7 @@ import { AbortUpdate, Thenable } from './types';
 export async function update<M extends BaseModel<any>>(
   model: M,
   updateFn: (previous: M) => Thenable<void | typeof AbortUpdate>,
-  options?: ICreateOrUpdateOptions<never>,
+  options?: IOptions<never>,
   container = assertContainer(model),
 ): Promise<M> {
   const result = await createOrUpdate(
@@ -52,7 +73,7 @@ export function createOrUpdate<T extends { id: string }, TCtor extends ModelCons
   partition: Partition<T, TCtor>,
   id: string,
   updateFn: (previous: InstanceType<TCtor> | undefined) => Thenable<InstanceType<TCtor>>,
-  options?: ICreateOrUpdateOptions<InstanceType<TCtor>>,
+  options?: IOptions<InstanceType<TCtor>>,
 ): Promise<InstanceType<TCtor>>;
 
 /**
@@ -74,7 +95,7 @@ export function createOrUpdate<T extends { id: string }, TCtor extends ModelCons
   updateFn: (
     previous: InstanceType<TCtor> | undefined,
   ) => Thenable<InstanceType<TCtor> | typeof AbortUpdate>,
-  options?: ICreateOrUpdateOptions<InstanceType<TCtor>>,
+  options?: IOptions<InstanceType<TCtor>>,
 ): Promise<InstanceType<TCtor> | undefined>;
 
 export async function createOrUpdate<T extends { id: string }, TCtor extends ModelConstructor<T>>(
@@ -83,12 +104,7 @@ export async function createOrUpdate<T extends { id: string }, TCtor extends Mod
   updateFn: (
     previous: InstanceType<TCtor> | undefined,
   ) => Thenable<InstanceType<TCtor> | typeof AbortUpdate>,
-  {
-    initialValue,
-    retries = 3,
-    mustFind = false,
-    ...reqOps
-  }: ICreateOrUpdateOptions<InstanceType<TCtor>> = {},
+  { initialValue, retries = 3, mustFind = false, ...reqOps }: IOptions<InstanceType<TCtor>> = {},
 ): Promise<InstanceType<TCtor> | undefined> {
   for (let i = 0; ; i++) {
     let model = initialValue;

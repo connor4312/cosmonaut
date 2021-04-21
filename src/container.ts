@@ -7,10 +7,7 @@ import { Schema } from './schema';
  * `Model.container()` method, but you can also instantiate it manually.
  */
 export class Container<T> {
-  constructor(
-    private readonly schema: Schema<T>,
-    private readonly container: Cosmos.Container,
-  ) {}
+  constructor(private readonly schema: Schema<T>, private readonly container: Cosmos.Container) {}
 
   /**
    * Creates the container for the model.

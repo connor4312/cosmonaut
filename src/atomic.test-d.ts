@@ -1,7 +1,7 @@
 import { expectType } from 'tsd';
 import * as atomic from './atomic';
-import { AbortUpdate } from './types';
 import { exampleUser, User } from './testUtils';
+import { AbortUpdate } from './types';
 
 (async () => {
   expectType<User>(await atomic.update<User>(exampleUser, () => undefined));
@@ -9,7 +9,7 @@ import { exampleUser, User } from './testUtils';
   expectType<User>(
     await atomic.createOrUpdate(User.partition('a'), 'id', async prev => {
       if (!prev) {
-        return new User({ id: '1', favoriteColors: ['blue'], username: 'Connor' });
+        return new User({ id: '1', favoriteColors: new Set(['blue']), username: 'Connor' });
       } else {
         prev.props.username = 'Connor';
         return prev;

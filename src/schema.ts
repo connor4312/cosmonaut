@@ -4,13 +4,13 @@ import { mapValues } from './util';
 
 export interface ISchemaField<T> extends JSONSchema7 {
   isRequired?: boolean;
-  transform?: Transform<unknown, T>;
+  transform?: Transform<any, T>;
 }
 
 interface IFieldConfig<T> {
   schema: JSONSchema7;
   required: boolean;
-  transform?: Transform<unknown, T>;
+  transform?: Transform<any, T>;
 }
 
 type SchemaMap<T> = { [K in keyof T]: IFieldConfig<T[K]> };
@@ -97,7 +97,6 @@ export class BasicSchema<T> {
     return {
       type: 'object',
       required: Object.keys(this.schemaMap).filter(k => this.schemaMap[k as keyof T].required),
-      additionalProperties: false,
       properties: mapValues(this.schemaMap, v => v.schema ?? {}),
     };
   }
@@ -171,12 +170,12 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
       config = typeOrConfig;
     }
 
-    const { isRequired, ...schema } = config ?? {};
+    const { isRequired, transform, ...schema } = config ?? {};
 
     const merged = ({
       ...this.schemaMap,
       [name]: {
-        transform: config?.transform,
+        transform,
         required: isRequired || type?.isOptional === false,
         schema,
       } as IFieldConfig<TField>,
