@@ -2,6 +2,47 @@ import type * as Cosmos from '@azure/cosmos';
 import { JSONSchema7 } from 'json-schema';
 import { mapValues } from './util';
 
+/**
+ * Configures a field in the {@link schema}. Cosmosnaut uses
+ * [JSON Schema](https://json-schema.org/) as a standard, cross-language way to
+ * validate data. This object is a JSON 7 Schema which is validated by
+ * [Ajv](https://ajv.js.org/). The Ajv instance can be found as a static
+ * property on {@link BaseModel.ajv}, which you can use to register custom
+ * validation functions as needed.
+ *
+ * Once you define validation on the schema field, you can get a JSON Schema
+ * for the full model by calling `schema.jsonSchema`. Models can be
+ * individually validated by calling {@link BaseModel.validate}, and they're
+ * validated automatically when calling `save`, `create`, or `update`.
+ *
+ * Additionally, you can pass a {@link Transform} in the `transform` property
+ * here. Validation is run on the non-transformed, _database_ version of the
+ * properties.
+ *
+ * Here's an example using all of these features:
+ *
+ * ```ts
+ * const userSchema = createSchema('users')
+ *   .partitionKey('/id')
+ *   // Do some basic length validation on the username:
+ *   .field('username', asType<string>(), {
+ *     type: 'string',
+ *     maxLength: 20,
+ *     minLength: 2,
+ *   })
+ *   // Validate `favoriteColors`. Store it as an array in Cosmos DB, but
+ *   // use it as a Set in the model.
+ *   .field('favoriteColors', asType<Set<string>>(), {
+ *     type: 'array',
+ *     maxItems: 3,
+ *     items: { type: 'string' },
+ *     transform: new Transform<string[], Set<string>>(
+ *       stored => new Set(stored),
+ *       app => Array.from(app),
+ *     ),
+ *   });
+ * ```
+ */
 export interface ISchemaField<T> extends JSONSchema7 {
   isRequired?: boolean;
   transform?: Transform<any, T>;
@@ -342,11 +383,17 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
  *   ),
  * });
  * ```
+ *
+ * This is pased in the {@link ISchemaField}.
  */
-export class Transform<TStoredValue, TAppValue> {
+export class Transform<TStoredValue, TRuntimeValue> {
+  /**
+   * @param deserialize Function to transform from the database value to the runtime value
+   * @param serialize Function to transform from the runtime value back to the database value
+   */
   constructor(
-    public deserialize: (storedValue: TStoredValue) => TAppValue,
-    public serialize: (applicationValue: TAppValue) => TStoredValue,
+    public deserialize: (storedValue: TStoredValue) => TRuntimeValue,
+    public serialize: (applicationValue: TRuntimeValue) => TStoredValue,
   ) {}
 }
 

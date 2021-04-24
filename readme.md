@@ -1,8 +1,31 @@
 # Cosmonaut
 
+[![Validate](https://github.com/connor4312/cosmonaut/actions/workflows/validation.yml/badge.svg)](https://github.com/connor4312/cosmonaut/actions/workflows/validation.yml)
+
 Cosmonaut is an unofficial (Object Data Mapper) ODM for Cosmos DB. I grew tired of copying a utility library to use between projects. It has a strong emphasis on modularity and type-safety, while also aiming to be pleasant to use for non-TypeScript consumers.
 
-## Quick Example
+```
+npm i --save cosmonaut-odm
+```
+
+Unlike other TypeScript ORMs/ODMs, we don't use decorators. Decorators can be burdensome or impossible to deal with, especially for vanilla JS consumers and lack type-safety. Instead, the basis of everything is the well-typed "schema" from which the world is derived.
+
+## Features
+
+- [x] [Schema builder and typesafe schemas](https://cosmonaut-odm.peet.io/classes/schema.html)
+- [x] [Basic object data model](http://cosmonaut-odm.peet.io/classes/basemodel.html)
+- [x] [Atomic operations](http://cosmonaut-odm.peet.io/modules/atomic.html)
+- [x] [Validation](https://cosmonaut-odm.peet.io/interfaces/ischemafield.html)
+- [x] [Transformation functions](https://cosmonaut-odm.peet.io/classes/transform.html)
+- [x] [Query support](https://cosmonaut-odm.peet.io/classes/query.html)
+- [ ] RU telemetry
+- [ ] Pagination helpers
+- [ ] TTL normalization
+- [ ] 'relationships'
+
+Complete [API docs here](http://cosmonaut-odm.peet.io/).
+
+## Quickstart
 
 ```ts
 import { Model, createSchema, asType } from 'cosmonaut-odm';
@@ -43,26 +66,6 @@ user.props.favoriteColors.push('green');
 // Save, delete, and so on.
 await user.save();
 ```
-
-## Features
-
-- [x] Schema builder and typesafe schemas
-- [x] Basic object data model
-- [x] Atomic operations
-- [x] Validation
-- [x] Transformation functions
-- [x] Query support
-- [ ] RU telemetry
-- [ ] Pagination helpers
-- [ ] 'relationships'
-
-## Concepts
-
-Unlike other TypeScript ORMs/ODMs, we don't use decorators. Decorators can be burdensome or impossible to deal with, especially for vanilla JS consumers and lack type-safety. Instead, the basis of everything is the well-typed "schema" from which the world is derived.
-
-## Documentation
-
-todo
 
 ## Contributing
 

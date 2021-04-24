@@ -47,13 +47,13 @@ export interface IDeleteOptions extends Cosmos.RequestOptions {
  */
 export abstract class BaseModel<T extends { id: string }> {
   /**
-   * Schema for this model.
+   * {@link Schema} for this model.
    */
   public abstract schema: BasicSchema<T>;
 
   /**
    * Gets a partition accessor for the collection. See {@link Partition} for
-   * things you can do on the model.
+   * more information.
    */
   public abstract partition: (
     container?: Cosmos.Container,
@@ -72,10 +72,10 @@ export abstract class BaseModel<T extends { id: string }> {
   public static cosmosContainer?: Cosmos.Container;
 
   /**
-   * Instance of [ajv](https://ajv.js.org/) use for validation. You can modify
+   * Instance of [ajv](https://ajv.js.org/) used for validation. You can modify
    * or replace this as needed, to add custom validators for example.
    * Modifications must happen before you start using models, since validation
-   * schemas will be compiled and cached once they're used.
+   * functions will be compiled and cached the first time they're used.
    */
   public static ajv = new Ajv();
 
@@ -93,7 +93,7 @@ export abstract class BaseModel<T extends { id: string }> {
    * loaded from the database.
    */
   public get updatedAt() {
-    return this.props._ts && new Date(this.props._ts * 1000);
+    return this.props._ts === undefined ? undefined : new Date(this.props._ts * 1000);
   }
 
   /**
@@ -305,7 +305,8 @@ export abstract class BaseModel<T extends { id: string }> {
   }
 
   /**
-   * Gets the JSON validation function for this model.
+   * Gets the validation function for the JSON schema defined in the
+   * {@link ISchemaField | ISchemaFields} for this model.
    */
   public readonly getValidateFunction = once(() => BaseModel.ajv.compile(this.schema.jsonSchema));
 }

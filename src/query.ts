@@ -2,13 +2,14 @@ import type * as Cosmos from '@azure/cosmos';
 import { ModelConstructor } from './baseModel';
 
 /**
- * Template literal tag type that produces a Cosmos DB query. For example:
+ * Template literal tag function that produces a Cosmos DB query. For example:
  *
  * ```
  * User.query(sql`SELECT users.* FROM users WHERE users.username = ${username}`)
  * ```
  *
- * In this case, `${username}` is correctly extracted to a parameter.
+ * In this case, `${username}` is correctly extracted to a parameter. Useful
+ * for making security auditors' hearts skip a beat.
  */
 export const sql = (
   parts: TemplateStringsArray,
@@ -42,6 +43,11 @@ export type QueryIterator<T> = { [K in keyof Cosmos.QueryIterator<T>]: Cosmos.Qu
 
 const collectionNameRe = /\$self/g;
 
+/**
+ * The Query is a helper for running queries in a Cosmos DB collection. It can
+ * be acquired from {@link Partition.query} or the static `Model.crossPartitionQuery`
+ * method.
+ */
 export class Query<T extends { id: string }, TCtor extends ModelConstructor<T>> {
   /**
    * @hidden
@@ -65,6 +71,7 @@ export class Query<T extends { id: string }, TCtor extends ModelConstructor<T>> 
    * You can use the {@link sql} tagged template literal for easy querying,
    * and you can use `$self` placeholder in the string to refer to the
    * current collection.
+   * @param TOut Shape of returned data, defaults to the interface on the model
    */
   public raw<TOut = T>(
     spec: Cosmos.SqlQuerySpec | string,
@@ -95,12 +102,13 @@ export class Query<T extends { id: string }, TCtor extends ModelConstructor<T>> 
    * current collection.
    *
    * ```ts
-   * const r = User.crossPartitionQuery().run(sql`SELECT c.* FROM $self c WHERE username = ${name}`);
+   * const r = User.crossPartitionQuery().run(
+   *  sql`SELECT c.* FROM $self c WHERE username = ${name}`);
    *
    * for await (const { resources } of r.getAsyncIterator()){
    *   for (const model of resources) {
    *     model.coolness++;
-   *     model.save();
+   *     await model.save();
    *   }
    * }
    * ```

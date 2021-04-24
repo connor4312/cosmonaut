@@ -10,8 +10,9 @@
     "watch:test": "jest --watchAll",
     "compile": "rimraf dist && tsc",
     "docs": "typedoc src/index.ts",
-    "test": "npm run compile && concurrently npm:test:unit npm:test:lint npm:test:fmt",
+    "test": "concurrently npm:test:types npm:test:unit npm:test:lint npm:test:fmt",
     "test:unit": "jest",
+    "test:types": "tsc --noEmit",
     "test:unit:emulator": "cross-env COSMONAUT_USE_EMULATOR=1 jest --runInBand",
     "test:lint": "eslint \"src/**/*.ts\"",
     "test:fmt": "prettier --list-different \"src/**/*.ts\" \"*.md\"",
@@ -61,7 +62,7 @@
     "ts-jest": "^26.5.5",
     "tsd": "^0.14.0",
     "typedoc": "^0.20.36",
-    "typescript": "4.3.0-beta"
+    "typescript": "^4.2.4"
   },
   "dependencies": {
     "@types/json-schema": "^7.0.7",
