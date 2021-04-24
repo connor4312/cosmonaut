@@ -22,9 +22,3 @@ export const mapCosmosResourceResponse = <A, B>(
   etag: res.etag,
   resource: value,
 });
-
-/**
- * Can be returned from {@link Partition.createOrUpdateUsing} to cancel the
- * update.
- */
-export const AbortUpdate = Symbol('AbortUpdate');

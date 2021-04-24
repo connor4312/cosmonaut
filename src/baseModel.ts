@@ -35,6 +35,16 @@ export interface IDeleteOptions extends Cosmos.RequestOptions {
   force?: boolean;
 }
 
+/**
+ * The BaseModel is the foundational type for models, which is returned by
+ * a call to {@link Model}. It provides lifecycle hooks (which can be
+ * overridden) and methods for {@link BaseModel.save | saving},
+ * {@link BaseModel.delete | deleting}, and
+ * {@link BaseModel.validate | validating} a document in Cosmos DB.
+ *
+ * To look up a model, you'll usually use the methods on `Model.partition()`,
+ * or `Model.crossPartitionQuery()`.
+ */
 export abstract class BaseModel<T extends { id: string }> {
   /**
    * Schema for this model.
@@ -42,7 +52,8 @@ export abstract class BaseModel<T extends { id: string }> {
   public abstract schema: BasicSchema<T>;
 
   /**
-   * Gets a partition accessor for the collection.
+   * Gets a partition accessor for the collection. See {@link Partition} for
+   * things you can do on the model.
    */
   public abstract partition: (
     container?: Cosmos.Container,
@@ -164,6 +175,14 @@ export abstract class BaseModel<T extends { id: string }> {
   }
 
   /**
+   * Validates the current set of properties on the model.
+   * @throws Ajv.ValidationError
+   */
+  public validate() {
+    mustValidate(this.getValidateFunction(), transformToDatabase(this.schema, this.props));
+  }
+
+  /**
    * Creates the item, if it doesn't exist. If it does, an error is thrown.
    */
   public async create(
@@ -207,7 +226,7 @@ export abstract class BaseModel<T extends { id: string }> {
       mustValidate(this.getValidateFunction(), toSave);
     }
 
-    const response = await container.items.upsert(toSave, {
+    const response = await container.item(this.id).replace(toSave as Cosmos.ItemDefinition, {
       accessCondition:
         this.props._etag !== undefined && !force
           ? {

@@ -38,6 +38,7 @@ type CosmosIndexPathImpl<T, K extends keyof T> = K extends string
 /**
  * A generic type that, given an object, produces the types of all valid paths
  * in the object for indexing purposes.
+ * @hidden
  */
 export type CosmosIndexPath<T> = CosmosIndexPathImpl<Required<T>, keyof T> | '/*';
 
@@ -52,6 +53,7 @@ type CosmosSimplePathImpl<T, K extends keyof T> = K extends string
 /**
  * A generic type that, given an object, produces the types of all valid paths
  * in the object for unique and partition key constraints.
+ * @hidden
  */
 export type CosmosSimplePath<T> = CosmosSimplePathImpl<Required<T>, keyof T>;
 

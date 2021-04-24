@@ -1,10 +1,14 @@
 import type * as Cosmos from '@azure/cosmos';
 import { ModelConstructor } from './baseModel';
 import { CosmosError } from './errors';
+import { Query } from './query';
 import { BasicSchema, transformFromDatabase } from './schema';
 import { IResourceResponse, mapCosmosResourceResponse } from './types';
 
 export class Partition<T extends { id: string }, TCtor extends ModelConstructor<T>> {
+  /**
+   * @hidden
+   */
   constructor(
     public readonly container: Cosmos.Container,
     public readonly ctor: TCtor,
@@ -25,6 +29,13 @@ export class Partition<T extends { id: string }, TCtor extends ModelConstructor<
 
       throw e;
     }
+  }
+
+  /**
+   * Runs a query in the partition.
+   */
+  public get query() {
+    return new Query<T, TCtor>(this.container, this.ctor, this.schema.id, this.partitionKey);
   }
 
   /**
@@ -59,9 +70,9 @@ export class Partition<T extends { id: string }, TCtor extends ModelConstructor<
   }
 
   /**
-   * Looks deletes a model by ID.
+   * Deletes a model by ID.
    */
   public async delete(id: string, options?: Cosmos.RequestOptions) {
-    return this.container.item(id, this.partitionKey).delete(options);
+    return this.container.item(id, this.partitionKey).delete<T>(options);
   }
 }

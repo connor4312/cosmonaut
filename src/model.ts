@@ -2,6 +2,7 @@ import type * as Cosmos from '@azure/cosmos';
 import { assertContainer, BaseModel, ConstructorFor, ModelConstructor } from './baseModel';
 import { Container } from './container';
 import { Partition } from './partition';
+import { Query } from './query';
 import { Schema } from './schema';
 
 /**
@@ -27,6 +28,15 @@ import { Schema } from './schema';
  *   }
  * }
  * ```
+ *
+ * The returned class extends the {@link BaseModel} and has the following
+ * static properties, which TypeDoc does not represent well:
+ *
+ * - `Model.partition(partitionKey: stirng | number)` returns a {@link Partition}
+ *   to run operation in a single partition.
+ * - `Model.crossPartitionQuery()` returns a {@link Query}.
+ * - `Model.container()` returns the associated {@link Container}.
+ * - `Model.schema` is the source {@link Schema} object.
  */
 export const Model = <T extends { id: string }>(schema: Schema<T>) => {
   const ActualModel = class extends BaseModel<T> {
@@ -49,8 +59,17 @@ export const Model = <T extends { id: string }>(schema: Schema<T>) => {
       this: TCtor,
       partitionKey: string | number,
       container = assertContainer(this),
-    ): Partition<T, TCtor> {
+    ) {
       return new Partition<T, TCtor>(container, this, schema, partitionKey);
+    }
+    /**
+     * Starts running an operation for an item in a partition.
+     */
+    public static crossPartitionQuery<TCtor extends ModelConstructor<T>>(
+      this: TCtor,
+      container = assertContainer(this),
+    ) {
+      return new Query<T, TCtor>(container, this, schema.id);
     }
 
     /**

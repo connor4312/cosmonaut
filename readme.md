@@ -2,8 +2,6 @@
 
 Cosmonaut is an unofficial (Object Data Mapper) ODM for Cosmos DB. I grew tired of copying a utility library to use between projects. It has a strong emphasis on modularity and type-safety, while also aiming to be pleasant to use for non-TypeScript consumers.
 
-Notably, unlike other TypeScript ORMs/ODMs, we don't use decorators. Decorators are burdensome or impossible to deal with, especially for vanilla JS consumers and lack type-safety. Instead, the basis is the well-typed "schema" from which the world is derived.
-
 ## Quick Example
 
 ```ts
@@ -53,7 +51,18 @@ await user.save();
 - [x] Atomic operations
 - [x] Validation
 - [x] Transformation functions
-- [ ] Query support
+- [x] Query support
+- [ ] RU telemetry
+- [ ] Pagination helpers
+- [ ] 'relationships'
+
+## Concepts
+
+Unlike other TypeScript ORMs/ODMs, we don't use decorators. Decorators can be burdensome or impossible to deal with, especially for vanilla JS consumers and lack type-safety. Instead, the basis of everything is the well-typed "schema" from which the world is derived.
+
+## Documentation
+
+todo
 
 ## Contributing
 

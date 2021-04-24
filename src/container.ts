@@ -7,33 +7,33 @@ import { Schema } from './schema';
  * `Model.container()` method, but you can also instantiate it manually.
  */
 export class Container<T> {
-  constructor(private readonly schema: Schema<T>, private readonly container: Cosmos.Container) {}
+  constructor(private readonly schema: Schema<T>, public readonly instance: Cosmos.Container) {}
 
   /**
    * Creates the container for the model.
    */
   public create(options?: Cosmos.RequestOptions) {
-    return this.container.database.containers.createIfNotExists(this.schema.definition, options);
+    return this.instance.database.containers.createIfNotExists(this.schema.definition, options);
   }
 
   /**
    * Creates the container for the model.
    */
   public createIfNotExists(options?: Cosmos.RequestOptions) {
-    return this.container.database.containers.createIfNotExists(this.schema.definition, options);
+    return this.instance.database.containers.createIfNotExists(this.schema.definition, options);
   }
 
   /**
    * Replace the container's definition.
    */
   public replace(options?: Cosmos.RequestOptions) {
-    return this.container.replace(this.schema.definition, options);
+    return this.instance.replace(this.schema.definition, options);
   }
 
   /**
    * Delete the container.
    */
   public delete(options?: Cosmos.RequestOptions) {
-    return this.container.delete(options);
+    return this.instance.delete(options);
   }
 }

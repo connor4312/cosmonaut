@@ -1,7 +1,7 @@
 import type * as Cosmos from '@azure/cosmos';
 import { assertContainer, BaseModel, ModelConstructor } from './baseModel';
 import { Partition } from './partition';
-import { AbortUpdate, Thenable } from './types';
+import { Thenable } from './types';
 
 /**
  * Options for atomic operations.
@@ -33,7 +33,8 @@ export interface IOptions<T> extends Cosmos.RequestOptions {
  * as a result of a conflict. Therefore, you should make sure to have all
  * mutations happen inside the `updateFn` method, not before it.
  *
- * You can return the `AbortUpdate` symbol to cancel the operation.
+ * The update function should return the model when it's ready run the update,
+ * or `undefined` to cancel the operation.
  *
  * @param updateFn Function called to update the model. Should return the
  * model after making modifications to it.
@@ -41,17 +42,16 @@ export interface IOptions<T> extends Cosmos.RequestOptions {
  */
 export async function update<M extends BaseModel<any>>(
   model: M,
-  updateFn: (previous: M) => Thenable<void | typeof AbortUpdate>,
+  updateFn: (previous: M) => Thenable<M | undefined>,
   options?: IOptions<never>,
   container = assertContainer(model),
 ): Promise<M> {
   const result = await createOrUpdate(
     model.partition(container),
     model.id,
-    async m => {
-      model.props = m!;
-      const result = await updateFn(model);
-      return result === AbortUpdate ? AbortUpdate : model;
+    m => {
+      model.props = m!.props;
+      return updateFn(model);
     },
     { ...options, initialValue: model, mustFind: true },
   );
@@ -94,7 +94,7 @@ export function createOrUpdate<T extends { id: string }, TCtor extends ModelCons
   id: string,
   updateFn: (
     previous: InstanceType<TCtor> | undefined,
-  ) => Thenable<InstanceType<TCtor> | typeof AbortUpdate>,
+  ) => Thenable<InstanceType<TCtor> | undefined>,
   options?: IOptions<InstanceType<TCtor>>,
 ): Promise<InstanceType<TCtor> | undefined>;
 
@@ -103,7 +103,7 @@ export async function createOrUpdate<T extends { id: string }, TCtor extends Mod
   id: string,
   updateFn: (
     previous: InstanceType<TCtor> | undefined,
-  ) => Thenable<InstanceType<TCtor> | typeof AbortUpdate>,
+  ) => Thenable<InstanceType<TCtor> | undefined>,
   { initialValue, retries = 3, mustFind = false, ...reqOps }: IOptions<InstanceType<TCtor>> = {},
 ): Promise<InstanceType<TCtor> | undefined> {
   for (let i = 0; ; i++) {
@@ -113,7 +113,7 @@ export async function createOrUpdate<T extends { id: string }, TCtor extends Mod
     }
 
     const updated = await updateFn(model);
-    if (updated === AbortUpdate) {
+    if (!updated) {
       return undefined;
     }
 
@@ -121,7 +121,7 @@ export async function createOrUpdate<T extends { id: string }, TCtor extends Mod
       await updated.save(reqOps, partition.container);
       return updated;
     } catch (e) {
-      if (e.code === 412 && i < retries) {
+      if ((e.code === 412 || e.code === 409) && i < retries) {
         // etag precondition failed
         initialValue = undefined;
         continue;
