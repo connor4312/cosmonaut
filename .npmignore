@@ -1,4 +1,5 @@
 /*
 !/dist
-/dist/*.test.js
+/dist/*.test.*
 /dist/*.test-d.*
+/dist/*.map
