@@ -3,7 +3,7 @@ import { assertContainer, BaseModel, ConstructorFor, ModelConstructor } from './
 import { Container } from './container';
 import { Partition } from './partition';
 import { Query } from './query';
-import { Schema } from './schema';
+import { BasicSchema } from './schema';
 
 /**
  * Creates a class that represents the provided schema. You can use class
@@ -38,7 +38,7 @@ import { Schema } from './schema';
  * - `Model.container()` returns the associated {@link Container}.
  * - `Model.schema` is the source {@link Schema} object.
  */
-export const Model = <T extends { id: string }>(schema: Schema<T>) => {
+export const Model = <T extends { id: string }>(schema: BasicSchema<T>) => {
   const ActualModel = class extends BaseModel<T> {
     public readonly schema = schema;
 

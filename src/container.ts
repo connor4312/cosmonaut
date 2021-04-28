@@ -1,5 +1,5 @@
 import type * as Cosmos from '@azure/cosmos';
-import { Schema } from './schema';
+import { BasicSchema } from './schema';
 
 /**
  * The Container provides an interface for accessing operations dealing
@@ -7,7 +7,10 @@ import { Schema } from './schema';
  * `Model.container()` method, but you can also instantiate it manually.
  */
 export class Container<T> {
-  constructor(private readonly schema: Schema<T>, public readonly instance: Cosmos.Container) {}
+  constructor(
+    private readonly schema: BasicSchema<T>,
+    public readonly instance: Cosmos.Container,
+  ) {}
 
   /**
    * Creates the container for the model.
