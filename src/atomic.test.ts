@@ -59,6 +59,34 @@ describe('atomic', () => {
     });
   });
 
+  describe('findOrCreate', () => {
+    it('creates on new', async () => {
+      const u = await atomic.findOrCreate(
+        User.partition('id-a'),
+        'id-a',
+        new User({ id: 'id-a', favoriteColors: new Set(), username: 'connor' }),
+      );
+      expect(u.props.username).toBe('connor');
+      expect(u.etag).toBeTruthy();
+    });
+
+    it('finds on existing', async () => {
+      await new User({
+        id: 'id-a',
+        username: 'existing',
+        favoriteColors: new Set(['blue', 'red']),
+      }).create();
+
+      const u = await atomic.findOrCreate(
+        User.partition('id-a'),
+        'id-a',
+        new User({ id: 'id-a', favoriteColors: new Set(), username: 'connor' }),
+      );
+      expect(u.props.username).toBe('existing');
+      expect(u.etag).toBeTruthy();
+    });
+  });
+
   describe('update', () => {
     let user: User;
     beforeEach(async () => {

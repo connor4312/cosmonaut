@@ -71,6 +71,39 @@ export async function update<M extends BaseModel<any>>(
 }
 
 /**
+ * Finds the model identified by the partition ID, or creates it if it does
+ * not exist. You may pass in an instance of a model, or a function that
+ * creates an instance of the model.
+ *
+ * @throws Cosmos.ErrorResponse if the {@link IAtomicOptions.retries} are exhausted.
+ */
+export async function findOrCreate<T extends { id: string }, TCtor extends ModelConstructor<T>>(
+  partition: Partition<T, TCtor>,
+  id: string,
+  createOrModel: InstanceType<TCtor> | (() => Thenable<InstanceType<TCtor>>),
+  options?: IAtomicOptions<InstanceType<TCtor>>,
+): Promise<InstanceType<TCtor>> {
+  let model: InstanceType<TCtor> | undefined;
+  const returned = await createOrUpdate(
+    partition,
+    id,
+    existing => {
+      if (existing) {
+        model = existing;
+        return undefined;
+      } else if (typeof createOrModel === 'function') {
+        return createOrModel();
+      } else {
+        return createOrModel;
+      }
+    },
+    options,
+  );
+
+  return returned || model!;
+}
+
+/**
  * Creates or updates a model using the given function. The function will
  * be retried automaticaly in case a conflict happens, so could be called
  * multiple times. This similar to an "upsert" operation.

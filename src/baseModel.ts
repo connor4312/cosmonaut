@@ -36,6 +36,11 @@ export interface IDeleteOptions extends Cosmos.RequestOptions {
 }
 
 /**
+ * Helper type to get the data interface for a Model.
+ */
+export type InterfaceForModel<T> = T extends BaseModel<infer V> ? V : never;
+
+/**
  * The BaseModel is the foundational type for models, which is returned by
  * a call to {@link Model}. It provides lifecycle hooks (which can be
  * overridden) and methods for {@link BaseModel.save | saving},
@@ -302,6 +307,26 @@ export abstract class BaseModel<T extends { id: string }> {
     }
 
     return value as string | number;
+  }
+
+  /**
+   * Returns a shallow copy of the properties on the model, excluding internal
+   * Cosmos DB fields.
+   */
+  public toObject() {
+    const obj: Record<string, unknown> = {};
+    for (const key of Object.keys(this.schema.schemaMap)) {
+      obj[key] = this.props[key as keyof T];
+    }
+
+    return obj as T;
+  }
+
+  /**
+   * Implements JSON serialization, returns the same as {@link BaseModel.toObject}.
+   */
+  public toJSON() {
+    return this.toObject();
   }
 
   /**

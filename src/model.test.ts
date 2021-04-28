@@ -227,4 +227,19 @@ describe('Model', () => {
     const found2 = await User.partition('id-a').find('id-a');
     expect(found2.props.favoriteColors).toEqual(new Set(['red', 'blue']));
   });
+
+  it('toObject', () => {
+    const model = new User({
+      id: 'id-a',
+      username: 'connor',
+      favoriteColors: new Set(['red']),
+      _etag: 'shouldBeIgnored',
+    });
+
+    expect(model.toObject()).toEqual({
+      id: 'id-a',
+      username: 'connor',
+      favoriteColors: new Set(['red']),
+    });
+  });
 });
