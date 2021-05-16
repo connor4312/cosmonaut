@@ -1,6 +1,6 @@
 {
   "name": "cosmonaut-odm",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Azure Cosmos DB ODM",
   "main": "dist/index.js",
   "sideEffects": false,
