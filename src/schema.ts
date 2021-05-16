@@ -167,13 +167,16 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
   /**
    * Adds a new field to the schema.
    * @param name the name of the field
+   * @param field type, you can use the `asType<T>()` function
+   * to pass this in.
    * @param fieldConfig optional configuration for the field
    * @returns the modified schema
    */
-  public field<K extends string>(
+  public field<K extends string, TField>(
     name: K,
-    fieldConfig?: ISchemaField<unknown>,
-  ): Schema<T & { [K_ in K]?: unknown }>;
+    asType: AsType<OptionalType<TField>>,
+    fieldConfig?: ISchemaField<TField>,
+  ): Schema<T & { [K_ in K]?: TField }>;
 
   /**
    * Adds a new field to the schema.
@@ -187,11 +190,18 @@ export class Schema<T = { id: string }> extends BasicSchema<T> {
     name: K,
     asType: AsType<TField>,
     fieldConfig?: ISchemaField<TField>,
-  ): Schema<
-    TField extends OptionalType<infer TConcrete>
-      ? T & { [K_ in K]?: TConcrete }
-      : T & { [K_ in K]: TField }
-  >;
+  ): Schema<T & { [K_ in K]: TField }>;
+
+  /**
+   * Adds a new field to the schema.
+   * @param name the name of the field
+   * @param fieldConfig optional configuration for the field
+   * @returns the modified schema
+   */
+  public field<K extends string>(
+    name: K,
+    fieldConfig?: ISchemaField<unknown>,
+  ): Schema<T & { [K_ in K]?: unknown }>;
 
   /**
    * Adds a new field to the schema.
@@ -420,12 +430,12 @@ export const transformToDatabase = <T>(
 };
 
 declare class OptionalType<T> {
-  declare value: T;
-  declare optional: true;
+  declare readonly __type: T;
+  declare readonly __isOptionalType: true;
 }
 
 class AsType<T> {
-  declare value: T;
+  declare readonly __type: T;
 
   constructor(public readonly isOptional: boolean) {}
 

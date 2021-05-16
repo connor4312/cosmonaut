@@ -1,5 +1,9 @@
 # Changelog
 
+## TBA: 0.1.2
+
+- Fix boolean columns in schema being overloaded weirdly
+
 ## 0.1.1 - 2020-04-27
 
 - Add `atomic.findOrCreate`
